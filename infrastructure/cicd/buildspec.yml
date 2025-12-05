@@ -1,0 +1,55 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI_DJANGO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/whoosh-django-api
+      - REPOSITORY_URI_GO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/whoosh-go-game-edge
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH}-${CODEBUILD_BUILD_NUMBER}
+      - echo Build started on `date`
+      - echo Building the Docker images...
+
+  build:
+    commands:
+      - echo Building Django API image...
+      - cd services/django-api
+      - docker build -t $REPOSITORY_URI_DJANGO:$IMAGE_TAG .
+      - docker tag $REPOSITORY_URI_DJANGO:$IMAGE_TAG $REPOSITORY_URI_DJANGO:latest
+      - echo Building Go Game Edge image...
+      - cd ../go-game-edge
+      - docker build -t $REPOSITORY_URI_GO:$IMAGE_TAG .
+      - docker tag $REPOSITORY_URI_GO:$IMAGE_TAG $REPOSITORY_URI_GO:latest
+
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI_DJANGO:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_DJANGO:latest
+      - docker push $REPOSITORY_URI_GO:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_GO:latest
+      - echo Writing image definitions file...
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI_DJANGO:$IMAGE_TAG > django-image.json
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI_GO:$IMAGE_TAG > go-image.json
+      - echo Updating Kubernetes manifests...
+      - cd ../../infrastructure/k8s
+      - sed -i "s|<ECR_REPO_URL>/django-api:latest|$REPOSITORY_URI_DJANGO:$IMAGE_TAG|g" django/deployment.yaml
+      - sed -i "s|<ECR_REPO_URL>/go-game-edge:latest|$REPOSITORY_URI_GO:$IMAGE_TAG|g" go-game/deployment.yaml
+      - echo Configuring kubectl...
+      - aws eks update-kubeconfig --name whoosh-cluster --region $AWS_DEFAULT_REGION
+      - echo Deploying to EKS...
+      - kubectl apply -f django/
+      - kubectl apply -f go-game/
+      - kubectl apply -f ingress/
+      - echo Deployment completed
+
+artifacts:
+  files:
+    - django-image.json
+    - go-image.json
+    - infrastructure/k8s/**/*
+

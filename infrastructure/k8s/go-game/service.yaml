@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-game-edge
+  namespace: default
+  labels:
+    app: go-game-edge
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: ws
+  selector:
+    app: go-game-edge
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 900  # 15 minutes
+

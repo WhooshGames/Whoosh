@@ -1,0 +1,20 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Configuring kubectl...
+      - aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION
+
+  build:
+    commands:
+      - echo Deploying to EKS...
+      - cd infrastructure/k8s
+      - kubectl apply -f django/
+      - kubectl apply -f go-game/
+      - kubectl apply -f ingress/
+      - echo Waiting for deployments to be ready...
+      - kubectl rollout status deployment/django-api -n default --timeout=300s
+      - kubectl rollout status deployment/go-game-edge -n default --timeout=300s
+      - echo Deployment completed successfully
+
