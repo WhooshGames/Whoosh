@@ -27,6 +27,17 @@ var (
 
 func main() {
 	flag.Parse()
+	
+	// Override with environment variables if set
+	if envRedisAddr := os.Getenv("REDIS_ADDR"); envRedisAddr != "" {
+		*redisAddr = envRedisAddr
+	}
+	if envJWTKey := os.Getenv("JWT_PUBLIC_KEY"); envJWTKey != "" {
+		*jwtPublicKey = envJWTKey
+	}
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		*port = envPort
+	}
 
 	// Initialize Redis client
 	redisClient := redis.NewClient(*redisAddr)

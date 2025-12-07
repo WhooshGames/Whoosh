@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -23,10 +22,12 @@ const (
 
 // Client represents a WebSocket client connection
 type Client struct {
-	Conn     *websocket.Conn
-	SendChan chan []byte
-	UserID   string
-	GameID   string
+	Conn        *websocket.Conn
+	SendChan    chan []byte
+	UserID      string
+	GameID      string
+	IsGuest     bool
+	DisplayName string
 }
 
 // Packet represents a WebSocket message packet
@@ -104,12 +105,39 @@ func (c *Client) WritePump() {
 }
 
 // NewClient creates a new WebSocket client
-func NewClient(conn *websocket.Conn, userID, gameID string) *Client {
+func NewClient(conn *websocket.Conn, userID, gameID string, isGuest bool, displayName string) *Client {
 	return &Client{
-		Conn:     conn,
-		SendChan: make(chan []byte, 256),
-		UserID:   userID,
-		GameID:   gameID,
+		Conn:        conn,
+		SendChan:    make(chan []byte, 256),
+		UserID:      userID,
+		GameID:      gameID,
+		IsGuest:     isGuest,
+		DisplayName: displayName,
 	}
+}
+
+// GetUserID returns the user ID
+func (c *Client) GetUserID() string {
+	return c.UserID
+}
+
+// GetGameID returns the game ID
+func (c *Client) GetGameID() string {
+	return c.GameID
+}
+
+// Send sends data to the client (implements game.Client interface)
+func (c *Client) Send(data []byte) error {
+	select {
+	case c.SendChan <- data:
+		return nil
+	default:
+		return nil // Channel full, skip
+	}
+}
+
+// GetSendChan returns the send channel (implements game.Client interface)
+func (c *Client) GetSendChan() chan []byte {
+	return c.SendChan
 }
 

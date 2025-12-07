@@ -9,15 +9,17 @@ WORKDIR /build
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
+# Copy go mod files first for dependency caching
+COPY go.mod go.sum* ./
 
-# Copy source code
+# Copy source code to determine dependencies
 COPY . .
 
-# Build static binary for ARM64
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
+# Download dependencies and tidy (this will create go.sum if it doesn't exist)
+RUN go mod download && go mod tidy
+
+# Build static binary for AMD64 (x86_64) - matching t3.micro instances
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags='-w -s -extldflags "-static"' \
     -o server \
     ./cmd/server

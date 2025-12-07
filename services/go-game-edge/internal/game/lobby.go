@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/whooshgames/whoosh/go-game-edge/internal/redis"
-	"github.com/whooshgames/whoosh/go-game-edge/internal/websocket"
 )
 
 // Phase represents the current game phase
@@ -25,7 +24,7 @@ type Lobby struct {
 	ID          string
 	Phase       Phase
 	TickRate    *time.Ticker
-	Clients     map[*websocket.Client]bool
+	Clients     map[Client]bool
 	ConfMeter   map[string]string // userID -> suspectID
 	Mutex       sync.RWMutex
 	startTime   time.Time
@@ -39,7 +38,7 @@ func NewLobby(gameID string, redisClient *redis.Client) *Lobby {
 	return &Lobby{
 		ID:          gameID,
 		Phase:       PhaseWaiting,
-		Clients:     make(map[*websocket.Client]bool),
+		Clients:     make(map[Client]bool),
 		ConfMeter:   make(map[string]string),
 		startTime:   time.Now(),
 		redis:       redisClient,
@@ -67,14 +66,14 @@ func (l *Lobby) Stop() {
 }
 
 // AddClient adds a WebSocket client to the lobby
-func (l *Lobby) AddClient(client *websocket.Client) {
+func (l *Lobby) AddClient(client Client) {
 	l.Mutex.Lock()
 	defer l.Mutex.Unlock()
 	l.Clients[client] = true
 }
 
 // RemoveClient removes a WebSocket client from the lobby
-func (l *Lobby) RemoveClient(client *websocket.Client) {
+func (l *Lobby) RemoveClient(client Client) {
 	l.Mutex.Lock()
 	defer l.Mutex.Unlock()
 	delete(l.Clients, client)
@@ -100,7 +99,7 @@ func (l *Lobby) GetConfidenceMeter() map[string]string {
 }
 
 // Broadcast sends a packet to all clients in the lobby
-func (l *Lobby) Broadcast(packet websocket.Packet) {
+func (l *Lobby) Broadcast(packet Packet) {
 	l.Mutex.RLock()
 	defer l.Mutex.RUnlock()
 
@@ -111,7 +110,7 @@ func (l *Lobby) Broadcast(packet websocket.Packet) {
 
 	for client := range l.Clients {
 		select {
-		case client.SendChan <- data:
+		case client.GetSendChan() <- data:
 		default:
 			// Channel full, skip this client
 		}
@@ -143,7 +142,7 @@ func (l *Lobby) processTick() {
 		l.Phase = PhaseVoting
 		l.Mutex.Unlock()
 
-		l.Broadcast(websocket.Packet{
+		l.Broadcast(Packet{
 			Type: "EVENT_NEWS",
 			Payload: map[string]interface{}{
 				"message": "Breaking news event!",
@@ -183,7 +182,7 @@ func (l *Lobby) broadcastState() {
 	remaining := l.gameDuration - elapsed
 	l.Mutex.RUnlock()
 
-	l.Broadcast(websocket.Packet{
+	l.Broadcast(Packet{
 		Type: "TICK",
 		Payload: map[string]interface{}{
 			"phase":     string(phase),
@@ -222,7 +221,7 @@ func (l *Lobby) endGame() {
 	}
 
 	// Broadcast game over
-	l.Broadcast(websocket.Packet{
+	l.Broadcast(Packet{
 		Type: "GAME_OVER",
 		Payload: map[string]interface{}{
 			"winner_id": winnerID,

@@ -3,9 +3,12 @@ Authentication views for JWT-based auth.
 """
 import boto3
 import json
+import uuid
+from datetime import timedelta, datetime
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -54,6 +57,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         token['user_id'] = str(user.id)
         token['username'] = user.username
+        token['is_guest'] = user.is_guest
+        if user.display_name:
+            token['display_name'] = user.display_name
+        
+        # Set shorter expiration for guest tokens (24 hours instead of default)
+        if user.is_guest:
+            from rest_framework_simplejwt.utils import aware_utcnow
+            token.set_exp(from_time=aware_utcnow(), lifetime=timedelta(hours=24))
+        
         return token
 
 
@@ -89,14 +101,26 @@ def register(request):
         password=password
     )
 
-    refresh = RefreshToken.for_user(user)
+    refresh_token = RefreshToken.for_user(user)
+    access_token = refresh_token.access_token
+    
+    # Add custom claims
+    refresh_token['user_id'] = str(user.id)
+    refresh_token['username'] = user.username
+    refresh_token['is_guest'] = user.is_guest
+    access_token['user_id'] = str(user.id)
+    access_token['username'] = user.username
+    access_token['is_guest'] = user.is_guest
+    
     return Response({
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
+        'refresh': str(refresh_token),
+        'access': str(access_token),
         'user': {
             'id': user.id,
             'username': user.username,
             'email': user.email,
+            'display_name': user.display_name,
+            'is_guest': user.is_guest,
         }
     }, status=status.HTTP_201_CREATED)
 
@@ -129,16 +153,177 @@ def login(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    serializer = CustomTokenObtainPairSerializer()
-    tokens = serializer.get_token(user)
+    # Generate tokens with custom claims
+    refresh_token = RefreshToken.for_user(user)
+    access_token = refresh_token.access_token
+    
+    refresh_token['user_id'] = str(user.id)
+    refresh_token['username'] = user.username
+    refresh_token['is_guest'] = user.is_guest
+    access_token['user_id'] = str(user.id)
+    access_token['username'] = user.username
+    access_token['is_guest'] = user.is_guest
+    
+    if user.display_name:
+        refresh_token['display_name'] = user.display_name
+        access_token['display_name'] = user.display_name
     
     return Response({
-        'refresh': str(tokens),
-        'access': str(tokens.access_token),
+        'refresh': str(refresh_token),
+        'access': str(access_token),
         'user': {
             'id': user.id,
             'username': user.username,
             'email': user.email,
+            'display_name': user.display_name,
+            'is_guest': user.is_guest,
+        }
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_guest(request):
+    """Create a temporary guest account."""
+    configure_jwt_keys()  # Ensure keys are loaded
+    
+    display_name = request.data.get('display_name', '').strip()
+    
+    # Generate unique guest username
+    guest_id = uuid.uuid4().hex[:8]
+    username = f"Guest_{guest_id}"
+    
+    # Ensure username is unique (very unlikely but handle it)
+    while User.objects.filter(username=username).exists():
+        guest_id = uuid.uuid4().hex[:8]
+        username = f"Guest_{guest_id}"
+    
+    # Create guest user
+    user = User.objects.create_user(
+        username=username,
+        email=None,  # Guests don't need email
+        password=None,  # Guests don't have passwords
+        is_guest=True,
+        display_name=display_name if display_name else None,
+        session_expires_at=timezone.now() + timedelta(hours=24)
+    )
+    
+    # Generate JWT tokens with shorter expiration for guests
+    # For guests, we need custom token expiration (24 hours)
+    from rest_framework_simplejwt.utils import aware_utcnow
+    
+    refresh_token = RefreshToken.for_user(user)
+    access_token = refresh_token.access_token
+    
+    # Add custom claims
+    refresh_token['user_id'] = str(user.id)
+    refresh_token['username'] = user.username
+    refresh_token['is_guest'] = user.is_guest
+    access_token['user_id'] = str(user.id)
+    access_token['username'] = user.username
+    access_token['is_guest'] = user.is_guest
+    
+    if user.display_name:
+        refresh_token['display_name'] = user.display_name
+        access_token['display_name'] = user.display_name
+    
+    # Set 24-hour expiration for guest tokens
+    if user.is_guest:
+        refresh_token.set_exp(from_time=aware_utcnow(), lifetime=timedelta(hours=24))
+        access_token.set_exp(from_time=aware_utcnow(), lifetime=timedelta(hours=24))
+    
+    return Response({
+        'refresh': str(refresh_token),
+        'access': str(access_token),
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'display_name': user.display_name,
+            'is_guest': user.is_guest,
+        }
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+def convert_guest(request):
+    """Convert a guest account to a full account."""
+    configure_jwt_keys()  # Ensure keys are loaded
+    
+    # User must be authenticated (permission_classes default requires authentication)
+    if not request.user.is_authenticated:
+        return Response(
+            {'error': 'Authentication required'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    user = request.user
+    
+    # Check if user is actually a guest
+    if not user.is_guest:
+        return Response(
+            {'error': 'User is not a guest account'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Get registration info
+    username = request.data.get('username')
+    email = request.data.get('email')
+    password = request.data.get('password')
+    
+    if not username or not email or not password:
+        return Response(
+            {'error': 'Username, email, and password are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Check if username already exists
+    if User.objects.filter(username=username).exclude(id=user.id).exists():
+        return Response(
+            {'error': 'Username already exists'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Check if email already exists
+    if User.objects.filter(email=email).exclude(id=user.id).exists():
+        return Response(
+            {'error': 'Email already exists'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Convert guest to full account
+    user.username = username
+    user.email = email
+    user.set_password(password)
+    user.is_guest = False
+    user.session_expires_at = None
+    # Keep display_name if it was set
+    user.save()
+    
+    # Generate new tokens with full expiration (default settings)
+    refresh_token = RefreshToken.for_user(user)
+    access_token = refresh_token.access_token
+    
+    # Add custom claims
+    refresh_token['user_id'] = str(user.id)
+    refresh_token['username'] = user.username
+    refresh_token['is_guest'] = user.is_guest
+    access_token['user_id'] = str(user.id)
+    access_token['username'] = user.username
+    access_token['is_guest'] = user.is_guest
+    
+    if user.display_name:
+        refresh_token['display_name'] = user.display_name
+        access_token['display_name'] = user.display_name
+    
+    return Response({
+        'refresh': str(refresh_token),
+        'access': str(access_token),
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'display_name': user.display_name,
+            'is_guest': user.is_guest,
         }
     }, status=status.HTTP_200_OK)
 

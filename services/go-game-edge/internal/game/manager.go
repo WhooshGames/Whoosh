@@ -3,7 +3,6 @@ package game
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/whooshgames/whoosh/go-game-edge/internal/redis"
 )
@@ -68,5 +67,10 @@ func (m *Manager) Shutdown(ctx context.Context) {
 		lobby.Stop()
 		delete(m.lobbies, gameID)
 	}
+}
+
+// GetJWTPublicKey returns the JWT public key
+func (m *Manager) GetJWTPublicKey() interface{} {
+	return m.jwtPubKey
 }
 

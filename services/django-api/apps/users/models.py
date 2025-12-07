@@ -13,7 +13,15 @@ class User(AbstractUser):
     wins = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Guest account fields
+    is_guest = models.BooleanField(default=False)
+    display_name = models.CharField(max_length=50, null=True, blank=True)
+    session_expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'users'
+        indexes = [
+            models.Index(fields=['is_guest', 'session_expires_at']),
+        ]
 
