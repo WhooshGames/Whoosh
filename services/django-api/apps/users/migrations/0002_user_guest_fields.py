@@ -7,11 +7,11 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('auth', '0012_alter_user_first_name_max_length'),
+        ('contenttypes', '0002_remove_content_type_name'),
     ]
     
     # This migration adds fields to the existing User model
-    # If 0001_initial doesn't exist, Django will create it automatically
-    # when running makemigrations, or this will be renamed to 0001
+    # It depends on auth migrations since User extends AbstractUser
 
     operations = [
         migrations.AddField(
