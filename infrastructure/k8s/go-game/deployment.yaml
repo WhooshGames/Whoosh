@@ -26,7 +26,7 @@ spec:
         workload: game-engine
       containers:
       - name: go-game-edge
-        image: <ECR_REPO_URL>/go-game-edge:latest
+        image: 590544116310.dkr.ecr.us-east-1.amazonaws.com/whoosh-go-game-edge:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -37,18 +37,24 @@ spec:
             configMapKeyRef:
               name: go-game-config
               key: redis-addr
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: go-game-secrets
+              key: redis-password
         - name: JWT_PUBLIC_KEY
           valueFrom:
             secretKeyRef:
               name: go-game-secrets
               key: jwt-public-key
+              optional: true
         resources:
           requests:
-            cpu: 1000m
-            memory: 2Gi
+            cpu: 500m
+            memory: 512Mi
           limits:
-            cpu: 4000m
-            memory: 4Gi
+            cpu: 1500m
+            memory: 1.5Gi
         livenessProbe:
           httpGet:
             path: /health

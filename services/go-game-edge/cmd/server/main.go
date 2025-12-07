@@ -20,9 +20,10 @@ import (
 )
 
 var (
-	port         = flag.String("port", "8080", "Server port")
-	redisAddr    = flag.String("redis-addr", "localhost:6379", "Redis address")
-	jwtPublicKey = flag.String("jwt-public-key", "", "JWT public key (PEM format)")
+	port          = flag.String("port", "8080", "Server port")
+	redisAddr     = flag.String("redis-addr", "localhost:6379", "Redis address")
+	redisPassword = flag.String("redis-password", "", "Redis password")
+	jwtPublicKey  = flag.String("jwt-public-key", "", "JWT public key (PEM format)")
 )
 
 func main() {
@@ -32,6 +33,9 @@ func main() {
 	if envRedisAddr := os.Getenv("REDIS_ADDR"); envRedisAddr != "" {
 		*redisAddr = envRedisAddr
 	}
+	if envRedisPassword := os.Getenv("REDIS_PASSWORD"); envRedisPassword != "" {
+		*redisPassword = envRedisPassword
+	}
 	if envJWTKey := os.Getenv("JWT_PUBLIC_KEY"); envJWTKey != "" {
 		*jwtPublicKey = envJWTKey
 	}
@@ -39,25 +43,49 @@ func main() {
 		*port = envPort
 	}
 
-	// Initialize Redis client
-	redisClient := redis.NewClient(*redisAddr)
-	if err := redisClient.Ping(context.Background()); err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+	// Initialize Redis client with retry logic
+	redisClient := redis.NewClient(*redisAddr, *redisPassword)
+	
+	// Retry connection with exponential backoff
+	var err error
+	for i := 0; i < 5; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err = redisClient.Ping(ctx).Err()
+		cancel()
+		
+		if err == nil {
+			log.Println("Connected to Redis")
+			break
+		}
+		
+		if i < 4 {
+			waitTime := time.Duration(i+1) * 2 * time.Second
+			log.Printf("Failed to connect to Redis (attempt %d/5): %v. Retrying in %v...", i+1, err, waitTime)
+			time.Sleep(waitTime)
+		}
 	}
-	log.Println("Connected to Redis")
+	
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis after 5 attempts: %v", err)
+	}
 
-	// Load JWT public key
+	// Load JWT public key (optional - service can work without it for testing)
 	var pubKey *rsa.PublicKey
 	if *jwtPublicKey != "" {
 		block, _ := pem.Decode([]byte(*jwtPublicKey))
 		if block == nil {
-			log.Fatalf("Failed to decode JWT public key")
+			log.Printf("Warning: Failed to decode JWT public key - JWT validation will be disabled")
+		} else {
+			key, err := x509.ParsePKIXPublicKey(block.Bytes)
+			if err != nil {
+				log.Printf("Warning: Failed to parse JWT public key: %v - JWT validation will be disabled", err)
+			} else {
+				pubKey = key.(*rsa.PublicKey)
+				log.Println("JWT public key loaded successfully")
+			}
 		}
-		key, err := x509.ParsePKIXPublicKey(block.Bytes)
-		if err != nil {
-			log.Fatalf("Failed to parse JWT public key: %v", err)
-		}
-		pubKey = key.(*rsa.PublicKey)
+	} else {
+		log.Println("Warning: No JWT public key provided - JWT validation will be disabled")
 	}
 
 	// Initialize game manager
