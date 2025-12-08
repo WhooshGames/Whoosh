@@ -37,10 +37,9 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY --chown=appuser:appuser . .
 
-# Collect static files (need to be root to write to staticfiles directory)
-USER root
-RUN python manage.py collectstatic --noinput || true
-USER appuser
+# Copy startup script and make it executable
+COPY --chown=appuser:appuser start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # Set PATH to include user local bin
 ENV PATH=/home/appuser/.local/bin:$PATH
@@ -52,6 +51,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
 
-# Run Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--threads", "2", "--worker-class", "gthread", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "whoosh_api.wsgi:application"]
+# Run startup script (which collects static files and starts gunicorn)
+CMD ["/app/start.sh"]
 
