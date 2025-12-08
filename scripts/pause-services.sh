@@ -16,22 +16,22 @@ kubectl scale deployment go-game-edge --replicas=0 2>/dev/null || echo "  - go-g
 echo "  ✓ Kubernetes deployments scaled to 0"
 echo ""
 
-# 2. Scale down EKS node groups to 0
+# 2. Scale down EKS node groups to 0 (desiredSize=0 terminates all nodes)
 echo "2. Scaling down EKS node groups..."
 aws eks update-nodegroup-config \
     --cluster-name whoosh-cluster \
     --nodegroup-name django-nodes \
-    --scaling-config minSize=0,maxSize=0,desiredSize=0 \
+    --scaling-config minSize=0,maxSize=10,desiredSize=0 \
     --region $REGION \
-    --profile $PROFILE 2>/dev/null || echo "  - django-nodes already scaled or not found"
+    --profile $PROFILE 2>/dev/null && echo "  ✓ django-nodes scaling down..." || echo "  - django-nodes already scaled or not found"
 
 aws eks update-nodegroup-config \
     --cluster-name whoosh-cluster \
     --nodegroup-name go-nodes \
-    --scaling-config minSize=0,maxSize=0,desiredSize=0 \
+    --scaling-config minSize=0,maxSize=20,desiredSize=0 \
     --region $REGION \
-    --profile $PROFILE 2>/dev/null || echo "  - go-nodes already scaled or not found"
-echo "  ✓ EKS node groups scaled to 0"
+    --profile $PROFILE 2>/dev/null && echo "  ✓ go-nodes scaling down..." || echo "  - go-nodes already scaled or not found"
+echo "  Note: Nodes will terminate in a few minutes"
 echo ""
 
 # 3. Stop RDS instance (keeps data, can restart later)
