@@ -37,10 +37,9 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY --chown=appuser:appuser . .
 
-# Collect static files (run as root, then switch user)
+# Collect static files (need to be root to write to staticfiles directory)
 USER root
-RUN python -m pip install --user -r requirements.txt && \
-    python manage.py collectstatic --noinput || true
+RUN python manage.py collectstatic --noinput || true
 USER appuser
 
 # Set PATH to include user local bin
