@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whoosh - Social Deduction Game</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <div class="container">
+                <h1>🎉 Whoosh</h1>
+                <p>Loading...</p>
+            </div>
+        </div>
+
+        <!-- Landing Page -->
+        <div id="landing-screen" class="screen">
+            <div class="container">
+                <h1>🎉 Whoosh</h1>
+                <p class="subtitle">Social Deduction Game</p>
+                
+                <div class="auth-options">
+                    <button id="login-btn" class="btn btn-primary">Login</button>
+                    <button id="register-btn" class="btn btn-secondary">Register</button>
+                    <button id="guest-btn" class="btn btn-guest">Play as Guest</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-screen" class="screen">
+            <div class="container">
+                <h1>Login</h1>
+                <form id="login-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                    <button type="button" id="login-back" class="btn btn-link">Back</button>
+                </form>
+                <div id="login-error" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Register Form -->
+        <div id="register-screen" class="screen">
+            <div class="container">
+                <h1>Create Account</h1>
+                <form id="register-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                    <button type="button" id="register-back" class="btn btn-link">Back</button>
+                </form>
+                <div id="register-error" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Guest Form -->
+        <div id="guest-screen" class="screen">
+            <div class="container">
+                <h1>Play as Guest</h1>
+                <form id="guest-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="guest-display-name">Display Name (Optional)</label>
+                        <input type="text" id="guest-display-name" placeholder="Enter a display name">
+                    </div>
+                    <button type="submit" class="btn btn-guest">Start Playing</button>
+                    <button type="button" id="guest-back" class="btn btn-link">Back</button>
+                </form>
+                <div id="guest-error" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Dashboard/Profile -->
+        <div id="dashboard-screen" class="screen">
+            <div class="container">
+                <div class="dashboard-header">
+                    <h1>Welcome, <span id="user-display-name"></span>!</h1>
+                    <button id="logout-btn" class="btn btn-link">Logout</button>
+                </div>
+
+                <!-- Guest Badge -->
+                <div id="guest-badge" class="guest-badge" style="display: none;">
+                    <span>👤 Guest Account</span>
+                    <p>You're playing as a guest. Convert to a full account to save your progress!</p>
+                </div>
+
+                <!-- Profile Section -->
+                <div class="profile-section">
+                    <h2>Your Profile</h2>
+                    <div class="profile-grid">
+                        <div class="profile-card">
+                            <div class="card-label">Username</div>
+                            <div class="card-value" id="profile-username">-</div>
+                        </div>
+                        <div class="profile-card">
+                            <div class="card-label">Email</div>
+                            <div class="card-value" id="profile-email">-</div>
+                        </div>
+                        <div class="profile-card">
+                            <div class="card-label">Display Name</div>
+                            <div class="card-value" id="profile-display-name">-</div>
+                        </div>
+                        <div class="profile-card stat-card">
+                            <div class="card-label">ELO Rating</div>
+                            <div class="card-value stat-value" id="profile-elo">-</div>
+                        </div>
+                        <div class="profile-card stat-card">
+                            <div class="card-label">XP</div>
+                            <div class="card-value stat-value" id="profile-xp">-</div>
+                        </div>
+                        <div class="profile-card stat-card">
+                            <div class="card-label">Total Games</div>
+                            <div class="card-value stat-value" id="profile-total-games">-</div>
+                        </div>
+                        <div class="profile-card stat-card">
+                            <div class="card-label">Wins</div>
+                            <div class="card-value stat-value" id="profile-wins">-</div>
+                        </div>
+                        <div class="profile-card stat-card">
+                            <div class="card-label">Win Rate</div>
+                            <div class="card-value stat-value" id="profile-win-rate">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Convert Guest Form -->
+                <div id="convert-guest-section" class="convert-section" style="display: none;">
+                    <h2>Convert to Full Account</h2>
+                    <form id="convert-guest-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="convert-username">Username</label>
+                            <input type="text" id="convert-username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="convert-email">Email</label>
+                            <input type="email" id="convert-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="convert-password">Password</label>
+                            <input type="password" id="convert-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Convert Account</button>
+                    </form>
+                    <div id="convert-error" class="error-message"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+

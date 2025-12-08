@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whoosh - Test Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 600px;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        .status {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+        
+        .status-item {
+            margin: 0.5rem 0;
+            font-size: 1.1rem;
+        }
+        
+        .check {
+            color: #4ade80;
+            font-weight: bold;
+        }
+        
+        .info {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Whoosh</h1>
+        <p class="subtitle">Test Page - Deployment Successful!</p>
+        
+        <div class="status">
+            <div class="status-item">
+                <span class="check">✅</span> Website is live and accessible
+            </div>
+            <div class="status-item">
+                <span class="check">✅</span> Django API is running
+            </div>
+            <div class="status-item">
+                <span class="check">✅</span> Infrastructure deployed to AWS
+            </div>
+        </div>
+        
+        <div class="info">
+            <p>This is a simple test page to verify that the Whoosh website</p>
+            <p>is working correctly and can be accessed from the internet.</p>
+            <p style="margin-top: 1rem; font-size: 0.8rem;">
+                Server Time: {{ server_time }}
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+
