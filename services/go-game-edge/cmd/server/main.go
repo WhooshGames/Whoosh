@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -43,25 +44,66 @@ func main() {
 		*port = envPort
 	}
 
+	// Log connection details (without password)
+	log.Printf("Connecting to Redis at: %s (password: %s)", *redisAddr, func() string {
+		if *redisPassword != "" {
+			return "***SET***"
+		}
+		return "NOT SET"
+	}())
+	
+	// Test DNS resolution first
+	host := *redisAddr
+	if idx := len(host); idx > 0 {
+		for i := len(host) - 1; i >= 0; i-- {
+			if host[i] == ':' {
+				host = host[:i]
+				break
+			}
+		}
+	}
+	log.Printf("Resolving DNS for: %s", host)
+	ips, dnsErr := net.LookupIP(host)
+	if dnsErr != nil {
+		log.Printf("DNS resolution failed: %v", dnsErr)
+	} else {
+		log.Printf("DNS resolved to: %v", ips)
+	}
+	
+	// Test raw TCP connection
+	log.Printf("Testing raw TCP connection to %s...", *redisAddr)
+	tcpConn, tcpErr := net.DialTimeout("tcp", *redisAddr, 5*time.Second)
+	if tcpErr != nil {
+		log.Printf("Raw TCP connection failed: %v", tcpErr)
+	} else {
+		log.Printf("Raw TCP connection successful!")
+		tcpConn.Close()
+	}
+	
 	// Initialize Redis client with retry logic
 	redisClient := redis.NewClient(*redisAddr, *redisPassword)
 	
 	// Retry connection with exponential backoff
 	var err error
 	for i := 0; i < 5; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		err = redisClient.Ping(ctx).Err()
+		log.Printf("Redis client connection attempt %d/5...", i+1)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		start := time.Now()
+		err = redisClient.Ping(ctx)
+		duration := time.Since(start)
 		cancel()
 		
 		if err == nil {
-			log.Println("Connected to Redis")
+			log.Printf("Successfully connected to Redis! (took %v)", duration)
 			break
 		}
 		
 		if i < 4 {
 			waitTime := time.Duration(i+1) * 2 * time.Second
-			log.Printf("Failed to connect to Redis (attempt %d/5): %v. Retrying in %v...", i+1, err, waitTime)
+			log.Printf("Failed to connect to Redis (attempt %d/5, took %v): %v. Retrying in %v...", i+1, duration, err, waitTime)
 			time.Sleep(waitTime)
+		} else {
+			log.Printf("Final attempt failed (took %v): %v", duration, err)
 		}
 	}
 	
@@ -95,6 +137,21 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", websocket.HandleWebSocket(gameManager))
 	mux.HandleFunc("/health", healthCheck)
+	mux.HandleFunc("/test-redis", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := redisClient.Ping(ctx)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Redis connection failed: %v", err), http.StatusServiceUnavailable)
+			return
+		}
+		fmt.Fprintf(w, "Redis connection: OK\nAddress: %s\nPassword: %s", *redisAddr, func() string {
+			if *redisPassword != "" {
+				return "SET"
+			}
+			return "NOT SET"
+		}())
+	})
 
 	server := &http.Server{
 		Addr:         ":" + *port,

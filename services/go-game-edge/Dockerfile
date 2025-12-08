@@ -20,7 +20,7 @@ RUN go mod download && go mod tidy
 
 # Build static binary for AMD64 (x86_64) - matching t3.micro instances
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags='-w -s -extldflags "-static"' \
+    -ldflags "-w -s" \
     -o server \
     ./cmd/server
 
