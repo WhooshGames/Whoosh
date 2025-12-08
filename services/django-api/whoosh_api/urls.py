@@ -19,7 +19,8 @@ urlpatterns = [
     path('api/health/', auth_views.health_check, name='health'),  # Health check endpoint
 ]
 
-# Serve static files in development
+# WhiteNoise handles static files in production, so we don't need this
+# But keep it for development if needed
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 

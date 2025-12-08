@@ -37,11 +37,14 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Collect static files (run as root, then switch user)
+USER root
+RUN python -m pip install --user -r requirements.txt && \
+    python manage.py collectstatic --noinput || true
+USER appuser
+
 # Set PATH to include user local bin
 ENV PATH=/home/appuser/.local/bin:$PATH
-
-# Switch to non-root user
-USER appuser
 
 # Expose port
 EXPOSE 8000
